@@ -1,1 +1,152 @@
-[]
+[
+	{
+		"id": 1,
+		"intents": ["scheduling"],
+		"flags": []
+	},
+	{
+		"id": 2,
+		"intents": ["scheduling"],
+		"flags": []
+	},
+	{
+		"id": 3,
+		"intents": ["status"],
+		"flags": []
+	},
+	{
+		"id": 4,
+		"intents": ["status"],
+		"flags": []
+	},
+	{
+		"id": 5,
+		"intents": ["salary"],
+		"flags": []
+	},
+	{
+		"id": 6,
+		"intents": ["salary"],
+		"flags": []
+	},
+	{
+		"id": 7,
+		"intents": ["withdrawal"],
+		"flags": []
+	},
+	{
+		"id": 8,
+		"intents": ["withdrawal"],
+		"flags": []
+	},
+	{
+		"id": 9,
+		"intents": ["complaint"],
+		"flags": []
+	},
+	{
+		"id": 10,
+		"intents": ["complaint"],
+		"flags": []
+	},
+	{
+		"id": 11,
+		"intents": ["unclear"],
+		"flags": []
+	},
+	{
+		"id": 12,
+		"intents": ["unclear"],
+		"flags": []
+	},
+	{
+		"id": 13,
+		"intents": ["unclear"],
+		"flags": []
+	},
+	{
+		"id": 14,
+		"intents": ["status", "scheduling"],
+		"flags": []
+	},
+	{
+		"id": 15,
+		"intents": ["salary", "scheduling"],
+		"flags": []
+	},
+	{
+		"id": 16,
+		"intents": ["complaint", "status"],
+		"flags": []
+	},
+	{
+		"id": 17,
+		"intents": ["withdrawal", "complaint"],
+		"flags": []
+	},
+	{
+		"id": 18,
+		"intents": ["unclear"],
+		"flags": ["injection"]
+	},
+	{
+		"id": 19,
+		"intents": ["status"],
+		"flags": ["injection"]
+	},
+	{
+		"id": 20,
+		"intents": ["salary"],
+		"flags": ["injection"]
+	},
+	{
+		"id": 21,
+		"intents": ["complaint", "unclear"],
+		"flags": []
+	},
+	{
+		"id": 22,
+		"intents": ["scheduling"],
+		"flags": []
+	},
+	{
+		"id": 23,
+		"intents": ["status"],
+		"flags": []
+	},
+	{
+		"id": 24,
+		"intents": ["salary"],
+		"flags": []
+	},
+	{
+		"id": 25,
+		"intents": ["scheduling"],
+		"flags": []
+	},
+	{
+		"id": 26,
+		"intents": ["withdrawal", "unclear"],
+		"flags": []
+	},
+	{
+		"id": 27,
+		"intents": ["status"],
+		"flags": []
+	},
+	{
+		"id": 28,
+		"intents": ["status", "salary", "scheduling"],
+		"flags": []
+	},
+	{
+		"id": 29,
+		"intents": ["complaint"],
+		"flags": ["sensitive"]
+	},
+	{
+		"id": 30,
+		"intents": ["other"],
+		"flags": []
+	}
+]

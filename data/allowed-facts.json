@@ -1,1 +1,6 @@
-{}
+{
+	"companyName": "Acme Talent",
+	"interviewDays": "Monday to Friday",
+	"contactEmail": "careers@acmetalent.example",
+	"signOff": "Best regards, Acme Talent Recruitment Team"
+}
