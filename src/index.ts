@@ -5,7 +5,7 @@ import {
   getApiKey,
   MESSAGE_DELAY_MS,
 } from "./config.js";
-import { loadPipelineInput, runPipeline } from "./pipeline.js";
+import { getAttention, loadPipelineInput, runPipeline } from "./pipeline.js";
 import type { PipelineItem } from "./pipeline.js";
 
 type Decision = "sent" | "rejected";
@@ -102,17 +102,33 @@ export async function main(): Promise<void> {
     },
   });
 
+  const attentionRank = (item: PipelineItem): number => {
+    const level = getAttention({
+      issue: item.issue,
+      flags: item.output.flags,
+      ruleFindings: item.review.ruleFindings,
+    });
+    if (level === "urgent") return 2;
+    if (level === "review") return 1;
+    return 0;
+  };
+
+  const orderedItems = [...items].sort((left, right) => {
+    const diff = attentionRank(right) - attentionRank(left);
+    return diff !== 0 ? diff : left.message.id - right.message.id;
+  });
+
   const rl = createInterface({ input: stdin, output: stdout });
   let sent = 0;
   let rejected = 0;
 
   try {
-    for (let index = 0; index < items.length; index++) {
-      const item = items[index];
+    for (let index = 0; index < orderedItems.length; index++) {
+      const item = orderedItems[index];
       if (!item) {
         continue;
       }
-      const decision = await reviewItem(rl, item, index, items.length);
+      const decision = await reviewItem(rl, item, index, orderedItems.length);
       if (decision === "sent") {
         sent++;
       } else {

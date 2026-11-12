@@ -1,6 +1,6 @@
 # Inbox Helper
 
-Inbox Helper is a small tool for a recruiter's inbox. It reads candidate messages, groups them by what the candidate needs, and prepares a short reply. A person still checks every reply before it is marked as sent.
+Inbox Helper is a small tool for a recruiter's inbox. It reads candidate messages, labels each one by what the candidate needs, and prepares a short reply. Messages that need attention are shown first. A person still checks every reply before it is marked as sent.
 
 This is a local demo. "Send" only marks the message as sent in the app. No real email is sent.
 
@@ -107,6 +107,7 @@ Some live API tests are skipped when no real API key is set.
 ## A few notes
 
 - The app runs only on your computer.
-- The Gemini model name is in `src/config.ts`.
-- Messages are handled one at a time, with a short wait between calls.
+- The Gemini model name and thinking level are in `src/config.ts`.
+- Messages are handled up to 3 at a time, with a short wait between calls.
+- The app uses minimal thinking to keep analysis fast.
 - If the model has a problem, the item is marked for review instead of being sent.

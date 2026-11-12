@@ -1,5 +1,10 @@
+import { ThinkingLevel } from "@google/genai";
 import { describe, expect, it } from "vitest";
-import { buildPrompt } from "../src/llm.js";
+import {
+  GEMINI_MAX_OUTPUT_TOKENS,
+  GEMINI_REQUEST_TIMEOUT_MS,
+} from "../src/config.js";
+import { buildGenerationConfig, buildPrompt } from "../src/llm.js";
 import {
   FLAGS,
   FlagSchema,
@@ -99,6 +104,17 @@ describe("model output schema", () => {
         draft: 42,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("gemini generation config", () => {
+  it("uses minimal thinking, a bounded output, and a timeout", () => {
+    const config = buildGenerationConfig();
+
+    expect(config.responseMimeType).toBe("application/json");
+    expect(config.thinkingConfig?.thinkingLevel).toBe(ThinkingLevel.MINIMAL);
+    expect(config.maxOutputTokens).toBe(GEMINI_MAX_OUTPUT_TOKENS);
+    expect(config.httpOptions?.timeout).toBe(GEMINI_REQUEST_TIMEOUT_MS);
   });
 });
 

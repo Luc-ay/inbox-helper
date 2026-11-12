@@ -11,6 +11,15 @@ let messages = [];
 let items = new Map();
 let busy = false;
 
+const ATTENTION_RANK = {
+  urgent: 2,
+  review: 1,
+  normal: 0,
+};
+
+const attentionRank = (messageId) =>
+  ATTENTION_RANK[items.get(messageId)?.attention ?? "normal"];
+
 const request = async (url, options = {}) => {
   const init = { ...options };
   if (init.body) {
@@ -54,15 +63,15 @@ const renderSummary = () => {
     approved: 0,
     rejected: 0,
     sent: 0,
-    issues: 0,
+    attention: 0,
   };
 
   for (const item of items.values()) {
     if (Object.hasOwn(counts, item.status)) {
       counts[item.status] += 1;
     }
-    if (item.issue) {
-      counts.issues += 1;
+    if (item.attention === "urgent" || item.attention === "review") {
+      counts.attention += 1;
     }
   }
 
@@ -72,104 +81,152 @@ const renderSummary = () => {
     ` · ${counts.approved} approved` +
     ` · ${counts.sent} sent` +
     ` · ${counts.rejected} rejected` +
-    ` · ${counts.issues} flagged`;
+    ` · ${counts.attention} need attention`;
+};
+
+const updateCardElement = (card, message, item) => {
+  card.classList.remove("attention-urgent", "attention-review");
+  if (item?.attention === "urgent") {
+    card.classList.add("attention-urgent");
+  } else if (item?.attention === "review") {
+    card.classList.add("attention-review");
+  }
+
+  const badge = card.querySelector(".status-badge");
+  badge.className = "badge status-badge";
+  badge.textContent = item ? item.status : "not analyzed";
+  badge.classList.add(item ? item.status : "unanalyzed");
+
+  const intents = card.querySelector(".intents");
+  intents.replaceChildren();
+  const flags = card.querySelector(".flags");
+  flags.replaceChildren();
+
+  if (!item) {
+    intents.append(makeChip("not analyzed", "muted"));
+    flags.append(makeChip("not analyzed", "muted"));
+  } else {
+    if (item.intents.length > 0) {
+      item.intents.forEach((intent) => {
+        intents.append(makeChip(intent));
+      });
+    } else {
+      intents.append(makeChip("no intents", "muted"));
+    }
+
+    if (item.attention === "urgent") {
+      flags.append(makeChip("urgent", "attention-urgent"));
+    } else if (item.attention === "review") {
+      flags.append(makeChip("needs review", "attention-review"));
+    }
+
+    if (item.flags.length > 0) {
+      item.flags.forEach((flag) => {
+        flags.append(makeChip(flag, "flag"));
+      });
+    } else if (item.attention === "normal") {
+      flags.append(makeChip("no flags", "muted"));
+    }
+  }
+
+  const issue = card.querySelector(".issue");
+  if (item?.issue) {
+    issue.classList.remove("hidden");
+    issue.textContent =
+      `Model issue: ${item.issue}` +
+      (item.errorMessage ? ` — ${item.errorMessage}` : "");
+  } else {
+    issue.classList.add("hidden");
+    issue.textContent = "";
+  }
+
+  const draft = card.querySelector(".draft");
+  if (document.activeElement !== draft) {
+    draft.value = item?.draft ?? "";
+  }
+  draft.disabled = !item || item.status === "sent";
+
+  const ruleCheck = card.querySelector(".rule-check");
+  ruleCheck.className = "rule-check";
+  if (!item) {
+    ruleCheck.textContent = "Rule check: not run";
+  } else if (item.ruleFindings.length === 0) {
+    ruleCheck.textContent = "Rule check: clean";
+    ruleCheck.classList.add("clean");
+  } else {
+    ruleCheck.textContent =
+      "Rule check: " +
+      item.ruleFindings
+        .map((finding) => `${finding.kind} "${finding.text}"`)
+        .join(", ");
+    ruleCheck.classList.add("warning");
+  }
+
+  const analyzeButton = card.querySelector(".analyze-btn");
+  const approveButton = card.querySelector(".approve-btn");
+  const saveButton = card.querySelector(".save-btn");
+  const rejectButton = card.querySelector(".reject-btn");
+  const sendButton = card.querySelector(".send-btn");
+
+  analyzeButton.disabled = item?.status === "sent";
+  approveButton.disabled = !item || item.status !== "pending";
+  saveButton.disabled = !item || item.status === "sent";
+  rejectButton.disabled = !item || item.status === "sent";
+  sendButton.disabled = !item || item.status !== "approved";
 };
 
 const render = () => {
-  list.replaceChildren();
+  const orderedMessages = [...messages].sort((left, right) => left.id - right.id);
+  const existingCards = list.querySelectorAll(".card");
 
-  for (const message of messages) {
-    const item = items.get(message.id);
-    const card = template.content.firstElementChild.cloneNode(true);
-    card.dataset.messageId = String(message.id);
+  if (existingCards.length !== orderedMessages.length) {
+    list.replaceChildren();
 
-    card.querySelector(".message-id").textContent = `Message #${message.id}`;
-    card.querySelector(".candidate-text").textContent = message.text;
+    for (const message of orderedMessages) {
+      const card = template.content.firstElementChild.cloneNode(true);
+      card.dataset.messageId = String(message.id);
 
-    const badge = card.querySelector(".status-badge");
-    badge.textContent = item ? item.status : "not analyzed";
-    badge.classList.add(item ? item.status : "unanalyzed");
+      card.querySelector(".message-id").textContent = `Message #${message.id}`;
+      card.querySelector(".candidate-text").textContent = message.text;
 
-    const intents = card.querySelector(".intents");
-    const flags = card.querySelector(".flags");
+      const draft = card.querySelector(".draft");
+      const analyzeButton = card.querySelector(".analyze-btn");
+      const approveButton = card.querySelector(".approve-btn");
+      const saveButton = card.querySelector(".save-btn");
+      const rejectButton = card.querySelector(".reject-btn");
+      const sendButton = card.querySelector(".send-btn");
 
-    if (!item) {
-      intents.append(makeChip("not analyzed", "muted"));
-      flags.append(makeChip("not analyzed", "muted"));
-    } else {
-      if (item.intents.length > 0) {
-        item.intents.forEach((intent) => {
-          intents.append(makeChip(intent));
-        });
-      } else {
-        intents.append(makeChip("no intents", "muted"));
+      analyzeButton.addEventListener("click", () => {
+        void analyze(message.id);
+      });
+      approveButton.addEventListener("click", async () => {
+        const item = items.get(message.id);
+        const currentDraft = draft.value.trim();
+        if (item && currentDraft && currentDraft !== item.draft) {
+          await review(message.id, "edit", currentDraft);
+        }
+        void review(message.id, "approve");
+      });
+      saveButton.addEventListener("click", () => {
+        void review(message.id, "edit", draft.value.trim());
+      });
+      rejectButton.addEventListener("click", () => {
+        void review(message.id, "reject");
+      });
+      sendButton.addEventListener("click", () => {
+        void review(message.id, "send");
+      });
+
+      updateCardElement(card, message, items.get(message.id));
+      list.append(card);
+    }
+  } else {
+    for (const message of orderedMessages) {
+      const card = list.querySelector(`[data-message-id="${message.id}"]`);
+      if (card) {
+        updateCardElement(card, message, items.get(message.id));
       }
-
-      if (item.flags.length > 0) {
-        item.flags.forEach((flag) => {
-          flags.append(makeChip(flag, "flag"));
-        });
-      } else {
-        flags.append(makeChip("no flags", "muted"));
-      }
     }
-
-    const issue = card.querySelector(".issue");
-    if (item?.issue) {
-      issue.classList.remove("hidden");
-      issue.textContent =
-        `Model issue: ${item.issue}` +
-        (item.errorMessage ? ` — ${item.errorMessage}` : "");
-    }
-
-    const draft = card.querySelector(".draft");
-    draft.value = item?.draft ?? "";
-    draft.disabled = !item || item.status === "sent";
-
-    const ruleCheck = card.querySelector(".rule-check");
-    if (!item) {
-      ruleCheck.textContent = "Rule check: not run";
-    } else if (item.ruleFindings.length === 0) {
-      ruleCheck.textContent = "Rule check: clean";
-      ruleCheck.classList.add("clean");
-    } else {
-      ruleCheck.textContent =
-        "Rule check: " +
-        item.ruleFindings
-          .map((finding) => `${finding.kind} "${finding.text}"`)
-          .join(", ");
-      ruleCheck.classList.add("warning");
-    }
-
-    const analyzeButton = card.querySelector(".analyze-btn");
-    const approveButton = card.querySelector(".approve-btn");
-    const saveButton = card.querySelector(".save-btn");
-    const rejectButton = card.querySelector(".reject-btn");
-    const sendButton = card.querySelector(".send-btn");
-
-    analyzeButton.disabled = item?.status === "sent";
-    approveButton.disabled = !item || item.status !== "pending";
-    saveButton.disabled = !item || item.status === "sent";
-    rejectButton.disabled = !item || item.status === "sent";
-    sendButton.disabled = !item || item.status !== "approved";
-
-    analyzeButton.addEventListener("click", () => {
-      void analyze(message.id);
-    });
-    approveButton.addEventListener("click", () => {
-      void review(message.id, "approve");
-    });
-    saveButton.addEventListener("click", () => {
-      void review(message.id, "edit", draft.value.trim());
-    });
-    rejectButton.addEventListener("click", () => {
-      void review(message.id, "reject");
-    });
-    sendButton.addEventListener("click", () => {
-      void review(message.id, "send");
-    });
-
-    list.append(card);
   }
 
   renderSummary();
@@ -187,25 +244,78 @@ const analyze = async (messageId) => {
   }
 
   setBusy(true);
-  setNotice(
-    messageId === undefined
-      ? "Analyzing all messages..."
-      : `Analyzing message #${messageId}...`,
-  );
 
+  if (messageId !== undefined) {
+    setNotice(`Analyzing message #${messageId}...`);
+    try {
+      const data = await request("/api/analyze", {
+        method: "POST",
+        body: JSON.stringify({ messageId }),
+      });
+      applyItems(data.items);
+      setNotice(`Analyzed message #${messageId}.`);
+    } catch (error) {
+      setNotice(error.message, "error");
+    } finally {
+      setBusy(false);
+      render();
+    }
+    return;
+  }
+
+  // Batch analysis in chunks of 3 with live auto-show
+  setNotice("Starting batch analysis (chunks of 3 at 4 RPM)...");
   try {
-    const data = await request("/api/analyze", {
+    const response = await fetch("/api/analyze", {
       method: "POST",
-      body: JSON.stringify(
-        messageId === undefined ? {} : { messageId },
-      ),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
     });
-    applyItems(data.items);
-    setNotice(
-      `Analyzed ${data.items.length} message${
-        data.items.length === 1 ? "" : "s"
-      }.`,
-    );
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Request failed with ${response.status}.`);
+    }
+
+    if (!response.body) {
+      throw new Error("Streaming not supported by browser.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const msg = JSON.parse(line);
+        if (msg.type === "chunk") {
+          applyItems(msg.items);
+          render();
+          const { completedMessages, totalMessages, chunkIndex, totalChunks } =
+            msg.progress;
+          if (completedMessages < totalMessages) {
+            setNotice(
+              `Analyzed ${completedMessages}/${totalMessages} messages (Chunk ${
+                chunkIndex + 1
+              }/${totalChunks}). Waiting for next 3-message chunk...`,
+            );
+          } else {
+            setNotice(`Analyzed all ${totalMessages} messages.`);
+          }
+        } else if (msg.type === "done") {
+          setNotice("Finished analyzing all messages.");
+        }
+      }
+    }
   } catch (error) {
     setNotice(error.message, "error");
   } finally {

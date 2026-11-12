@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { GoogleGenAI } from "@google/genai";
-import { DIRECTIVE_PATH, GEMINI_MODEL, getApiKey } from "./config.js";
+import type { GenerateContentConfig } from "@google/genai";
+import {
+  DIRECTIVE_PATH,
+  GEMINI_MAX_OUTPUT_TOKENS,
+  GEMINI_MODEL,
+  GEMINI_REQUEST_TIMEOUT_MS,
+  GEMINI_THINKING_LEVEL,
+  getApiKey,
+} from "./config.js";
 import { ModelOutputSchema } from "./types.js";
 import type { AllowedFacts, Message, ModelOutput } from "./types.js";
 
@@ -15,6 +23,18 @@ export class InvalidModelOutputError extends Error {
 }
 
 const directive = readFileSync(DIRECTIVE_PATH, "utf8");
+
+export const buildGenerationConfig = (): GenerateContentConfig => ({
+  responseMimeType: "application/json",
+  temperature: 0.2,
+  thinkingConfig: {
+    thinkingLevel: GEMINI_THINKING_LEVEL,
+  },
+  maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
+  httpOptions: {
+    timeout: GEMINI_REQUEST_TIMEOUT_MS,
+  },
+});
 
 const stripCodeFences = (raw: string): string => {
   const trimmed = raw.trim();
@@ -86,10 +106,7 @@ export async function analyzeMessage(
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      },
+      config: buildGenerationConfig(),
     });
 
     const raw = response.text;

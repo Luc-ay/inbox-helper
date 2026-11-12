@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import {
   ALLOWED_FACTS_PATH,
+  ANALYSIS_CONCURRENCY,
+  CHUNK_INTERVAL_MS,
+  CHUNK_SIZE,
   MESSAGES_PATH,
   MESSAGE_DELAY_MS,
   RETRY_DELAY_MS,
@@ -8,9 +11,37 @@ import {
 import { analyzeMessage, InvalidModelOutputError } from "./llm.js";
 import { createReviewItem } from "./review.js";
 import type { ReviewItem } from "./review.js";
-import type { AllowedFacts, Message, ModelOutput } from "./types.js";
+import type {
+  AllowedFacts,
+  Flag,
+  Message,
+  ModelOutput,
+  RuleFinding,
+} from "./types.js";
 
 export type PipelineIssue = "invalid-model-output" | "model-error";
+
+export type AttentionLevel = "urgent" | "review" | "normal";
+
+export interface AttentionInput {
+  issue: PipelineIssue | null;
+  flags: readonly Flag[];
+  ruleFindings: readonly RuleFinding[];
+}
+
+export const getAttention = (input: AttentionInput): AttentionLevel => {
+  if (
+    input.issue !== null ||
+    input.flags.includes("sensitive") ||
+    input.flags.includes("injection")
+  ) {
+    return "urgent";
+  }
+  if (input.ruleFindings.length > 0) {
+    return "review";
+  }
+  return "normal";
+};
 
 export interface PipelineItem {
   message: Message;
@@ -25,11 +56,25 @@ export type Analyzer = (
   allowedFacts: AllowedFacts,
 ) => Promise<ModelOutput>;
 
+export interface ChunkProgress {
+  chunkIndex: number;
+  totalChunks: number;
+  completedMessages: number;
+  totalMessages: number;
+}
+
 export interface PipelineOptions {
   delayMs?: number;
   retryDelayMs?: number;
+  concurrency?: number;
+  chunkSize?: number;
+  chunkIntervalMs?: number;
   analyzer?: Analyzer;
   onProgress?: (item: PipelineItem, index: number, total: number) => void;
+  onChunkComplete?: (
+    chunkItems: PipelineItem[],
+    progress: ChunkProgress,
+  ) => void;
 }
 
 export interface PipelineInput {
@@ -125,17 +170,33 @@ export async function runPipeline(
   allowedFacts: AllowedFacts,
   options: PipelineOptions = {},
 ): Promise<PipelineItem[]> {
+  if (messages.length === 0) {
+    return [];
+  }
+
   const delayMs = options.delayMs ?? MESSAGE_DELAY_MS;
   const retryDelayMs = options.retryDelayMs ?? RETRY_DELAY_MS;
   const analyzer = options.analyzer ?? analyzeMessage;
-  const items: PipelineItem[] = [];
+  const concurrency = Math.max(
+    1,
+    Math.min(options.concurrency ?? ANALYSIS_CONCURRENCY, messages.length),
+  );
+  const chunkSize = Math.max(1, options.chunkSize ?? CHUNK_SIZE);
+  const chunkIntervalMs =
+    options.chunkIntervalMs ??
+    (options.delayMs === 0 ? 0 : CHUNK_INTERVAL_MS);
 
-  for (let index = 0; index < messages.length; index++) {
-    const message = messages[index];
-    if (!message) {
-      continue;
-    }
+  const chunks: Message[][] = [];
+  for (let i = 0; i < messages.length; i += chunkSize) {
+    chunks.push(messages.slice(i, i + chunkSize));
+  }
 
+  const allResults: PipelineItem[] = [];
+  let totalProcessed = 0;
+
+  const processMessage = async (
+    message: Message,
+  ): Promise<PipelineItem> => {
     let output = FALLBACK_OUTPUT;
     let issue: PipelineIssue | null = null;
     let errorMessage: string | null = null;
@@ -163,7 +224,7 @@ export async function runPipeline(
       }
     }
 
-    const item: PipelineItem = {
+    return {
       message,
       output,
       issue,
@@ -175,14 +236,72 @@ export async function runPipeline(
         allowedFacts,
       }),
     };
+  };
 
-    items.push(item);
-    options.onProgress?.(item, index, messages.length);
+  for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+    const chunkMessages = chunks[chunkIdx];
+    if (!chunkMessages || chunkMessages.length === 0) {
+      continue;
+    }
 
-    if (index < messages.length - 1 && delayMs > 0) {
-      await wait(delayMs);
+    const chunkStartTime = Date.now();
+    const chunkResults: Array<PipelineItem | undefined> = new Array(
+      chunkMessages.length,
+    );
+    let nextIndex = 0;
+
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const idx = nextIndex++;
+        if (idx >= chunkMessages.length) {
+          return;
+        }
+
+        const message = chunkMessages[idx];
+        if (!message) {
+          continue;
+        }
+
+        const item = await processMessage(message);
+        chunkResults[idx] = item;
+        const globalIndex = totalProcessed + idx;
+        options.onProgress?.(item, globalIndex, messages.length);
+
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+      }
+    };
+
+    const workerCount = Math.max(
+      1,
+      Math.min(concurrency, chunkMessages.length),
+    );
+    await Promise.all(
+      Array.from({ length: workerCount }, () => worker()),
+    );
+
+    const validChunkItems = chunkResults.filter(
+      (item): item is PipelineItem => item !== undefined,
+    );
+    allResults.push(...validChunkItems);
+    totalProcessed += validChunkItems.length;
+
+    options.onChunkComplete?.(validChunkItems, {
+      chunkIndex: chunkIdx,
+      totalChunks: chunks.length,
+      completedMessages: totalProcessed,
+      totalMessages: messages.length,
+    });
+
+    if (chunkIdx < chunks.length - 1 && chunkIntervalMs > 0) {
+      const elapsed = Date.now() - chunkStartTime;
+      const remainingWait = Math.max(0, chunkIntervalMs - elapsed);
+      if (remainingWait > 0) {
+        await wait(remainingWait);
+      }
     }
   }
 
-  return items;
+  return allResults;
 }

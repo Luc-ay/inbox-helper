@@ -3,8 +3,16 @@ import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { GEMINI_MODEL, UI_DIR, UI_PORT, getApiKey } from "./config.js";
-import { loadPipelineInput, runPipeline } from "./pipeline.js";
-import type { PipelineIssue, PipelineItem } from "./pipeline.js";
+import {
+  getAttention,
+  loadPipelineInput,
+  runPipeline,
+} from "./pipeline.js";
+import type {
+  AttentionLevel,
+  PipelineIssue,
+  PipelineItem,
+} from "./pipeline.js";
 import { ReviewGateError } from "./review.js";
 import type {
   AllowedFacts,
@@ -24,6 +32,7 @@ interface PipelineItemDto {
   ruleFindings: RuleFinding[];
   issue: PipelineIssue | null;
   errorMessage: string | null;
+  attention: AttentionLevel;
 }
 
 class HttpError extends Error {
@@ -69,6 +78,11 @@ const toDto = (item: PipelineItem): PipelineItemDto => ({
   ruleFindings: item.review.ruleFindings,
   issue: item.issue,
   errorMessage: item.errorMessage,
+  attention: getAttention({
+    issue: item.issue,
+    flags: item.output.flags,
+    ruleFindings: item.review.ruleFindings,
+  }),
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -163,16 +177,40 @@ const analyze = async (
     throw new HttpError(404, `Message ${messageId} was not found.`);
   }
 
-  if (messageId === undefined) {
-    itemsByMessageId.clear();
+  if (messageId !== undefined) {
+    const results = await runPipeline(targets, allowedFacts);
+    for (const item of results) {
+      itemsByMessageId.set(item.message.id, item);
+    }
+    sendJson(res, 200, { items: results.map(toDto) });
+    return;
   }
 
-  const results = await runPipeline(targets, allowedFacts);
-  for (const item of results) {
-    itemsByMessageId.set(item.message.id, item);
-  }
+  // Stream in chunks of 3 for batch analysis
+  res.writeHead(200, {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
 
-  sendJson(res, 200, { items: results.map(toDto) });
+  await runPipeline(targets, allowedFacts, {
+    onChunkComplete: (chunkItems, progress) => {
+      for (const item of chunkItems) {
+        itemsByMessageId.set(item.message.id, item);
+      }
+      res.write(
+        JSON.stringify({
+          type: "chunk",
+          items: chunkItems.map(toDto),
+          progress,
+        }) + "\n",
+      );
+    },
+  });
+
+  res.write(JSON.stringify({ type: "done" }) + "\n");
+  res.end();
 };
 
 const review = async (

@@ -285,6 +285,27 @@ main {
   color: var(--danger);
 }
 
+.chip.attention-urgent {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.chip.attention-review {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.card.attention-urgent {
+  border-color: var(--danger);
+  box-shadow:
+    0 0 0 1px var(--danger-soft),
+    var(--shadow);
+}
+
+.card.attention-review {
+  border-color: #e9b949;
+}
+
 .chip.muted {
   background: #eef0f4;
   color: var(--muted);

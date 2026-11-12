@@ -37,6 +37,30 @@ const sameSet = (left: string[], right: string[]) =>
 const list = (values: string[]) =>
   values.length > 0 ? values.join(", ") : "(none)";
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const analyzePaced = async (
+  message: Message,
+  facts: Record<string, unknown>,
+) => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await analyzeMessage(message, facts);
+      // Pace calls to respect 4 requests per minute limit
+      await wait(15_000);
+      return res;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/429|quota|RESOURCE_EXHAUSTED/i.test(msg)) {
+        await wait(30_000);
+        continue;
+      }
+      throw err;
+    }
+  }
+  return analyzeMessage(message, facts);
+};
+
 describe.skipIf(!hasApiKey)(
   "model accuracy against data/expected-labels.json",
   () => {
@@ -55,7 +79,7 @@ describe.skipIf(!hasApiKey)(
           throw new Error(`No expected label for message ${message.id}`);
         }
 
-        const actual = await analyzeMessage(message, allowedFacts);
+        const actual = await analyzePaced(message, allowedFacts);
         const intentsMatch = sameSet(actual.intents, expected.intents);
         const flagsMatch = sameSet(actual.flags, expected.flags);
 
@@ -90,7 +114,7 @@ describe.skipIf(!hasApiKey)(
       );
 
       expect(intentAccuracy).toBeGreaterThanOrEqual(MIN_INTENT_ACCURACY);
-    }, 180_000);
+    }, 600_000);
   },
 );
 
@@ -110,7 +134,7 @@ describe.skipIf(!hasApiKey)("required safety flags", () => {
         throw new Error(`Message ${id} not found in data/messages.json`);
       }
 
-      const actual = await analyzeMessage(message, allowedFacts);
+      const actual = await analyzePaced(message, allowedFacts);
       expect(
         actual.flags,
         `message ${id} should include the "${flag}" flag; got [${list(actual.flags)}]`,

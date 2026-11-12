@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { ThinkingLevel } from '@google/genai'
 import { resolve } from 'node:path'
 
-export const GEMINI_MODEL = 'gemini-3.6-flash'
+export const GEMINI_MODEL = 'gemini-3.5-flash-lite'
 
 export const GEMINI_THINKING_LEVEL = ThinkingLevel.MINIMAL
 
@@ -11,6 +11,12 @@ export const GEMINI_MAX_OUTPUT_TOKENS = 2048
 export const GEMINI_REQUEST_TIMEOUT_MS = 45_000
 
 export const ANALYSIS_CONCURRENCY = 3
+
+export const REQUESTS_PER_MINUTE = 4
+
+export const CHUNK_SIZE = 3
+
+export const CHUNK_INTERVAL_MS = (CHUNK_SIZE / REQUESTS_PER_MINUTE) * 60_000
 
 export const MIN_INTENT_ACCURACY = 0.7
 
