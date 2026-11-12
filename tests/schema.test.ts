@@ -5,7 +5,7 @@ import {
   INTENTS,
   IntentSchema,
   ModelOutputSchema,
-} from "../src/types";
+} from "../src/types.js";
 
 const validOutput = {
   intents: ["scheduling"],

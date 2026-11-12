@@ -2,8 +2,8 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MIN_INTENT_ACCURACY } from "../src/config";
-import { analyzeMessage } from "../src/llm";
+import { MIN_INTENT_ACCURACY } from "../src/config.js";
+import { analyzeMessage } from "../src/llm.js";
 
 interface Message {
   id: number;

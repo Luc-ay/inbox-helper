@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createReviewItem, ReviewGateError } from "../src/review";
+import { createReviewItem, ReviewGateError } from "../src/review.js";
 
 const allowedFacts = JSON.parse(
   readFileSync(resolve(process.cwd(), "data", "allowed-facts.json"), "utf8"),
