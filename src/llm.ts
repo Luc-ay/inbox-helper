@@ -46,7 +46,15 @@ const parseModelOutput = (raw: string): ModelOutput => {
     : new Error("Model output was not valid JSON.");
 };
 
-const buildPrompt = (message: Message, allowedFacts: AllowedFacts): string =>
+const neutralizeCandidateTags = (text: string): string =>
+  text.replace(/<\/?candidate_message\s*>/gi, (tag) =>
+    tag.replace("<", "&lt;").replace(">", "&gt;"),
+  );
+
+export const buildPrompt = (
+  message: Message,
+  allowedFacts: AllowedFacts,
+): string =>
   [
     directive,
     "",
@@ -55,7 +63,7 @@ const buildPrompt = (message: Message, allowedFacts: AllowedFacts): string =>
     "",
     "## Candidate message",
     "<candidate_message>",
-    message.text,
+    neutralizeCandidateTags(message.text),
     "</candidate_message>",
   ].join("\n");
 

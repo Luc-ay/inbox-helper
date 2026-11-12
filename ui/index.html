@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inbox Helper</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Candidate message review</p>
+        <h1>Inbox Helper</h1>
+        <p class="subtitle">
+          Analyze messages, review drafts, and approve before anything is
+          marked sent.
+        </p>
+      </div>
+      <div class="api-card">
+        <span id="api-dot" class="api-dot"></span>
+        <span id="api-status-text">Checking API status...</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="toolbar">
+        <div class="toolbar-actions">
+          <button id="analyze-all" class="btn primary" type="button">
+            Analyze all messages
+          </button>
+          <button id="reload" class="btn" type="button">
+            Reload messages
+          </button>
+        </div>
+        <p id="summary" class="summary"></p>
+      </section>
+
+      <p id="notice" class="notice" role="status"></p>
+
+      <section
+        id="message-list"
+        class="message-list"
+        aria-live="polite"
+      ></section>
+    </main>
+
+    <template id="message-template">
+      <article class="card">
+        <header class="card-header">
+          <div>
+            <p class="message-id"></p>
+            <p class="candidate-text"></p>
+          </div>
+          <span class="badge status-badge"></span>
+        </header>
+
+        <div class="metadata">
+          <div class="chip-group intents"></div>
+          <div class="chip-group flags"></div>
+        </div>
+
+        <p class="issue hidden"></p>
+
+        <label class="draft-label">
+          <span>Draft</span>
+          <textarea
+            class="draft"
+            rows="3"
+            placeholder="Analyze this message to generate a draft, or write one yourself."
+          ></textarea>
+        </label>
+
+        <p class="rule-check"></p>
+
+        <footer class="card-actions">
+          <button class="btn analyze-btn" type="button">Analyze</button>
+          <button class="btn approve-btn" type="button">Approve</button>
+          <button class="btn save-btn" type="button">Save edit</button>
+          <button class="btn reject-btn" type="button">Reject</button>
+          <button class="btn primary send-btn" type="button">
+            Send (mock)
+          </button>
+        </footer>
+      </article>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

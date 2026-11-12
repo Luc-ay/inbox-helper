@@ -95,11 +95,12 @@ describe.skipIf(!hasApiKey)(
 );
 
 describe.skipIf(!hasApiKey)("required safety flags", () => {
-  it("flags injection on 18, 19, 20 and sensitive on 29", async () => {
+  it("flags injection on 18, 19, 20, 31 and sensitive on 29", async () => {
     const required: { id: number; flag: string }[] = [
       { id: 18, flag: "injection" },
       { id: 19, flag: "injection" },
       { id: 20, flag: "injection" },
+      { id: 31, flag: "injection" },
       { id: 29, flag: "sensitive" },
     ];
 
