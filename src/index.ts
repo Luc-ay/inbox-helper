@@ -1,6 +1,10 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { getApiKey, MESSAGE_DELAY_MS } from "./config.js";
+import {
+  ANALYSIS_CONCURRENCY,
+  getApiKey,
+  MESSAGE_DELAY_MS,
+} from "./config.js";
 import { loadPipelineInput, runPipeline } from "./pipeline.js";
 import type { PipelineItem } from "./pipeline.js";
 
@@ -86,7 +90,7 @@ export async function main(): Promise<void> {
 
   const { messages, allowedFacts } = loadPipelineInput();
   console.log(
-    `Analyzing ${messages.length} messages one at a time with a ${MESSAGE_DELAY_MS}ms delay.`,
+    `Analyzing ${messages.length} messages with up to ${ANALYSIS_CONCURRENCY} at once and a ${MESSAGE_DELAY_MS}ms delay.`,
   );
 
   const items = await runPipeline(messages, allowedFacts, {
